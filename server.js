@@ -10,10 +10,23 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Servir arquivos estáticos da raiz (onde estão index.html e styles.css)
-app.use(express.static('.'));
+app.use(express.static('.', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    }
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 app.post("/send-location", async (req, res) => {
   const { latitude, longitude, maps } = req.body;
@@ -35,10 +48,6 @@ app.post("/send-location", async (req, res) => {
   }
 });
 
-// Rota para servir o index.html na raiz
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
 
 // Para desenvolvimento local
 if (process.env.NODE_ENV !== 'production') {
